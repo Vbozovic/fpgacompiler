@@ -3,4 +3,4 @@ project(fpgacompiler C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(fpgacompiler main.c)
+add_executable(fpgacompiler main.c stretchy_buffer.h commons.c)
