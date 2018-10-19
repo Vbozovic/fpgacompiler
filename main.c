@@ -5,8 +5,8 @@
 #include "commons.c"
 
 int main() {
-    buf_test();
 
-    printf("Hello, World!\n");
+    
+
     return 0;
 }
