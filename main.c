@@ -14,12 +14,10 @@ typedef enum TokenKind {
 
 typedef struct Token {
     TokenKind kind;
+    const char *start;
+    const char *end;
     union {
-        uint64_t intval; //ukoliko je token int literal cuvamo vrednost samog literala
-        struct {
-            const char *start;
-            const char *end;
-        };
+        uint64_t intval; //ukoliko je token int literal cuvamo vrednost samog literal
     };
 } Token;
 
@@ -29,7 +27,7 @@ const char *stream;
 Token currToken;
 
 void next_token() {
-
+    currToken.start = stream;
     switch (*stream) {
         case '0':
         case '1':
@@ -111,10 +109,7 @@ void next_token() {
                 //idemo na kraj strima
                 stream++;
             }
-
             currToken.kind = NAME_TOKEN;
-            currToken.start = begining;
-            currToken.end = stream;
         }
             break;
         default:
@@ -122,6 +117,8 @@ void next_token() {
             stream++;
             break;
     }
+
+    currToken.end = stream;
 
 }
 
