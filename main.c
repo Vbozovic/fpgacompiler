@@ -2,10 +2,26 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
-
+#include <stdbool.h>
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdarg.h>
 
 #include "stretchy_buffer.h"
 
+//POTENCIJALNI OVERFLOW
+static char err_buf[1024*1024];
+
+void fatal(const char *format, ...) {
+    va_list  args;
+    va_start(args,format);
+    printf("FATAL: ");
+    vprintf(format,args);
+    printf("\n");
+    va_end(args);
+    exit(1);
+}
 
 typedef enum TokenKind {
     INT_TOKEN = 128,
@@ -28,7 +44,7 @@ typedef struct Token {
 typedef struct IStr {
     size_t len;
     const char *str;
-}Istr;
+} Istr;
 
 static Istr *interns;
 
@@ -36,24 +52,24 @@ const char *str_intern_range(const char *start, const char *end) {
 
     size_t len = end - start;
     size_t i;
-    for(i=0;i<buf_len(interns);i++) {
-        if(interns[i].len == len && strncmp(interns[i].str,start,len) == 0){
+    for (i = 0; i < buf_len(interns); i++) {
+        if (interns[i].len == len && strncmp(interns[i].str, start, len) == 0) {
             //Nasli smo string
             return interns[i].str;
         }
     }
 
-    char* str = malloc(len+1);
-    memcpy(str,start,len);
-    str[len]=0; //null terminate
-    buf_push(interns,((Istr){len,str}));
+    char *str = malloc(len + 1);
+    memcpy(str, start, len);
+    str[len] = 0; //null terminate
+    buf_push(interns, ((Istr) {len, str}));
 
     return str;
 }
 
 
-const char* str_intern(const char* str){
-    return str_intern_range(str,str+strlen(str));
+const char *str_intern(const char *str) {
+    return str_intern_range(str, str + strlen(str));
 }
 
 const char *stream;
@@ -137,13 +153,13 @@ void next_token() {
         case 'Z':
         case '_': {
 
-            char *begining = stream;
+            const char *begining = stream;
             while (isalnum(*stream) || *stream == '_') {
                 //idemo na kraj strima
                 stream++;
             }
             currToken.kind = NAME_TOKEN;
-            currToken.name = str_intern_range(begining,stream);
+            currToken.name = str_intern_range(begining, stream);
         }
             break;
         default:
@@ -158,7 +174,6 @@ void next_token() {
 
 
 void printToken(Token tok) {
-
     switch (tok.kind) {
 
         case INT_TOKEN: {
@@ -175,7 +190,48 @@ void printToken(Token tok) {
         }
     }
 
+}
 
+const char *get_token_kind_name(TokenKind tok) {
+
+    switch (tok) {
+        case INT_TOKEN:
+            return "INT_TOKEN";
+        case NAME_TOKEN:
+            return "NAME_TOKEN";
+    }
+
+    return "NONE";
+}
+
+inline bool is_token(TokenKind kind) {
+    return currToken.kind == kind;
+}
+
+inline bool is_token_name(const char *name) {
+    return currToken.name == name;
+}
+
+
+
+//ukoliko je trenutni token ono sto trazimo (kind) onda idemo na sledeci token
+        inline bool match_token(TokenKind kind){
+    if (is_token(kind)) {
+        next_token();
+        return true;
+    } else {
+        return false;
+    }
+}
+
+//isto kao match token samo sto umesto da vratimo false mi cmeo da obustavimo sve
+inline bool expect_token(TokenKind kind) {
+    if (match_token(kind)) {
+        return true;
+    } else {
+        fatal("Expected %s , got %s",get_token_kind_name(kind),get_token_kind_name(currToken.kind));
+        return false;
+    }
 }
 
 void testLex() {
@@ -190,15 +246,15 @@ void testLex() {
 
 }
 
-void intrn_test(){
+void intrn_test() {
 
-    const char* x = "Vuk";
-    const char* y = "Vuk";
-    const char* z = "Vuk!";
+    const char *x = "Vuk";
+    const char *y = "Vuk";
+    const char *z = "Vuk!";
 
-    const char* px = str_intern(x);
-    const char* py = str_intern(y);
-    const char* pz = str_intern(z);
+    const char *px = str_intern(x);
+    const char *py = str_intern(y);
+    const char *pz = str_intern(z);
 
     assert(px == py);
     assert(py != pz);
