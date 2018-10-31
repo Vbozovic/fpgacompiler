@@ -11,8 +11,10 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zconf.h>
+#include <stdio.h>
 
-#include "commons.c"
+#include "common.h"
 
 
 typedef struct BufHdr {
@@ -31,6 +33,7 @@ typedef struct BufHdr {
 #define buf_free(b) ((b) ? (free(buf__hdr(b)), (b) = NULL) : 0)
 #define buf_fit(b, n) ((n) <= buf_cap(b) ? 0 : ((b) = buf__grow((b), (n), sizeof(*(b)))))
 #define buf_push(b, ...) (buf_fit((b), 1 + buf_len(b)), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
+#define buf_printf(b, ...) ((b) = buf__printf((b), __VA_ARGS__))
 #define buf_clear(b) ((b) ? buf__hdr(b)->len = 0 : 0)
 
 void *buf__grow(const void *buf, size_t new_len, size_t elem_size) {
@@ -41,36 +44,33 @@ void *buf__grow(const void *buf, size_t new_len, size_t elem_size) {
     size_t new_size = offsetof(BufHdr, buf) + new_cap*elem_size;
     BufHdr *new_hdr;
     if (buf) {
-        new_hdr = realloc(buf__hdr(buf), new_size);
+        new_hdr = xrealloc(buf__hdr(buf), new_size);
     } else {
-        new_hdr = malloc(new_size);
+        new_hdr = xmalloc(new_size);
         new_hdr->len = 0;
     }
     new_hdr->cap = new_cap;
     return new_hdr->buf;
 }
 
-
-void buf_test(void) {
-    int *buf = NULL;
-    assert(buf_len(buf) == 0);
-    int n = 1024;
-    for (int i = 0; i < n; i++) {
-        buf_push(buf, i);
+char *buf__printf(char *buf, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    size_t cap = buf_cap(buf) - buf_len(buf);
+    size_t n = 1 + vsnprintf(buf_end(buf), cap, fmt, args);
+    va_end(args);
+    if (n > cap) {
+        buf_fit(buf, n + buf_len(buf));
+        va_start(args, fmt);
+        size_t new_cap = buf_cap(buf) - buf_len(buf);
+        n = 1 + vsnprintf(buf_end(buf), new_cap, fmt, args);
+        assert(n <= new_cap);
+        va_end(args);
     }
-    assert(buf_len(buf) == n);
-    for (size_t i = 0; i < buf_len(buf); i++) {
-        assert(buf[i] == i);
-    }
-    buf_free(buf);
-    assert(buf == NULL);
-    assert(buf_len(buf) == 0);
-    //char *str = NULL;
-    //buf_printf(str, "One: %d\n", 1);
-    //assert(strcmp(str, "One: 1\n") == 0);
-    //buf_printf(str, "Hex: 0x%x\n", 0x12345678);
-    //assert(strcmp(str, "One: 1\nHex: 0x12345678\n") == 0);
+    buf__hdr(buf)->len += n - 1;
+    return buf;
 }
+
 
 
 #endif //FPGACOMPILER_STRECHY_BUFFER_H
