@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+
 
 #include "stretchy_buffer.h"
 
@@ -18,12 +20,43 @@ typedef struct Token {
     const char *end;
     union {
         uint64_t intval; //ukoliko je token int literal cuvamo vrednost samog literal
+        const char *name; //ime koje ce se internovati
     };
 } Token;
 
 
-const char *stream;
+typedef struct IStr {
+    size_t len;
+    const char *str;
+}Istr;
 
+static Istr *interns;
+
+const char *str_intern_range(const char *start, const char *end) {
+
+    size_t len = end - start;
+    size_t i;
+    for(i=0;i<buf_len(interns);i++) {
+        if(interns[i].len == len && strncmp(interns[i].str,start,len) == 0){
+            //Nasli smo string
+            return interns[i].str;
+        }
+    }
+
+    char* str = malloc(len+1);
+    memcpy(str,start,len);
+    str[len]=0; //null terminate
+    buf_push(interns,((Istr){len,str}));
+
+    return str;
+}
+
+
+const char* str_intern(const char* str){
+    return str_intern_range(str,str+strlen(str));
+}
+
+const char *stream;
 Token currToken;
 
 void next_token() {
@@ -110,6 +143,7 @@ void next_token() {
                 stream++;
             }
             currToken.kind = NAME_TOKEN;
+            currToken.name = str_intern_range(begining,stream);
         }
             break;
         default:
@@ -125,29 +159,28 @@ void next_token() {
 
 void printToken(Token tok) {
 
-    switch (tok.kind){
+    switch (tok.kind) {
 
-        case INT_TOKEN:{
-            printf("TOKEN INT: %d\n",tok.intval);
+        case INT_TOKEN: {
+            printf("TOKEN INT: %d\n", tok.intval);
             break;
         }
-        case NAME_TOKEN:{
-            printf("NAME TOKEN %.*s\n",(int)(tok.end-tok.start),tok.start);
+        case NAME_TOKEN: {
+            printf("NAME TOKEN %.*s\n", (int) (tok.end - tok.start), tok.start);
             break;
         }
-        default:{
-            printf("U:%c\n",tok.kind);
+        default: {
+            printf("U:%c\n", tok.kind);
             break;
         }
     }
-
 
 
 }
 
 void testLex() {
 
-    char *input = "() 1234+923 iden";
+    char *input = "() 1234+923 iden neki iden";
     stream = input;
     next_token();
     while (currToken.kind) {
@@ -157,10 +190,27 @@ void testLex() {
 
 }
 
+void intrn_test(){
+
+    const char* x = "Vuk";
+    const char* y = "Vuk";
+    const char* z = "Vuk!";
+
+    const char* px = str_intern(x);
+    const char* py = str_intern(y);
+    const char* pz = str_intern(z);
+
+    assert(px == py);
+    assert(py != pz);
+
+
+}
+
 
 int main() {
 
     testLex();
+    intrn_test();
 
     return 0;
 }
