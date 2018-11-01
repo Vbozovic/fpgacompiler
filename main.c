@@ -11,13 +11,13 @@
 #include "stretchy_buffer.h"
 
 //POTENCIJALNI OVERFLOW
-static char err_buf[1024*1024];
+static char err_buf[1024 * 1024];
 
 void fatal(const char *format, ...) {
-    va_list  args;
-    va_start(args,format);
+    va_list args;
+    va_start(args, format);
     printf("FATAL: ");
-    vprintf(format,args);
+    vprintf(format, args);
     printf("\n");
     va_end(args);
     exit(1);
@@ -35,7 +35,7 @@ typedef struct Token {
     const char *start;
     const char *end;
     union {
-        uint64_t intval; //ukoliko je token int literal cuvamo vrednost samog literal
+        int intval; //ukoliko je token int literal cuvamo vrednost samog literal
         const char *name; //ime koje ce se internovati
     };
 } Token;
@@ -88,7 +88,7 @@ void next_token() {
         case '7':
         case '8':
         case '9': {
-            uint64_t val = 0;
+            int val = 0;
             while (isdigit(*stream)) {
                 val *= 10;
                 val += *stream - '0';
@@ -204,7 +204,7 @@ const char *get_token_kind_name(TokenKind tok) {
     return "NONE";
 }
 
-inline bool is_token(TokenKind kind) {
+bool is_token(TokenKind kind) {
     return currToken.kind == kind;
 }
 
@@ -213,9 +213,8 @@ inline bool is_token_name(const char *name) {
 }
 
 
-
 //ukoliko je trenutni token ono sto trazimo (kind) onda idemo na sledeci token
-        inline bool match_token(TokenKind kind){
+bool match_token(TokenKind kind) {
     if (is_token(kind)) {
         next_token();
         return true;
@@ -225,13 +224,107 @@ inline bool is_token_name(const char *name) {
 }
 
 //isto kao match token samo sto umesto da vratimo false mi cmeo da obustavimo sve
-inline bool expect_token(TokenKind kind) {
+bool expect_token(TokenKind kind) {
     if (match_token(kind)) {
         return true;
     } else {
-        fatal("Expected %s , got %s",get_token_kind_name(kind),get_token_kind_name(currToken.kind));
+        fatal("Expected %s , got %s", get_token_kind_name(kind), get_token_kind_name(currToken.kind));
         return false;
     }
+}
+
+int parse_expr();
+
+int parse_expr3() {
+
+    if (is_token(INT_TOKEN)) {
+        int val = currToken.intval;
+        next_token(); //samo ga prepoznajemo
+        return val;
+    } else if (match_token('(')) {
+        int val = parse_expr(); //pravimo petlju
+        expect_token(')');
+        return val;
+    } else {
+        fatal("Expected integer or ( , got %s", get_token_kind_name(currToken.kind));
+    }
+
+
+}
+
+int parse_expr2() {
+    if (match_token('-')) {
+        return -parse_expr3();
+    } else {
+        return parse_expr3();
+    }
+}
+
+int parse_expr1() {
+    int val = parse_expr2();
+    int rval;
+    while (is_token('*') || is_token('/')) {
+        char operater = currToken.kind;
+        next_token();
+        rval = parse_expr2(); // ovde kaze parse_expr2() ???
+
+        if (operater == '*') {
+            val *= rval;
+        } else {
+            assert(operater == '/');
+            assert(rval != 0);
+
+            val /= rval;
+        }
+
+    }
+    return val;
+}
+
+int parse_expr0() {
+    int val = parse_expr1();
+    int rval;
+    while (is_token('+') || is_token('-')) {
+        char operater = currToken.kind;
+        next_token();
+        rval = parse_expr1();// ovde kaze parse_expr2() ???
+
+        if (operater == '+') {
+            val += rval;
+        } else {
+            assert(operater == '-');
+            val -= rval;
+        }
+
+    }
+    return val;
+}
+
+void init_stream(const char *init) {
+    stream = init;
+    next_token();
+}
+
+int parse_expr() {
+    return parse_expr0();
+}
+
+int test_parse_expresion(const char* str){
+    init_stream(str);
+    return parse_expr();
+}
+
+
+void testParse() {
+
+    assert(test_parse_expresion("1") == 1);
+    assert(test_parse_expresion("(1)") == 1);
+    assert(test_parse_expresion("1+2+3") == 6);
+    assert(test_parse_expresion("1+2*3") == 7);
+    assert(test_parse_expresion("(1+2)*3") == 9);
+    assert(test_parse_expresion("2*(1+2)*3") == 18);
+    assert(test_parse_expresion("2*3+4*5") == 26);
+
 }
 
 void testLex() {
@@ -267,6 +360,7 @@ int main() {
 
     testLex();
     intrn_test();
+    testParse();
 
     return 0;
 }
